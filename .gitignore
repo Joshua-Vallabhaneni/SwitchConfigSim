@@ -1,0 +1,23 @@
+# Compiled binaries
+switchctl
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE files
+.cursor/
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage files
+*.coverage
+*.prof
+
+# Temporary files
+*.tmp
+*.temp 
