@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http" // create web server, http requests
 	"os"       // reading files from disk
+	"os/exec"  // execute shell scripts from Go code
 )
 
 // Global vars to store the current switch state
@@ -123,14 +124,27 @@ func handleSwitchConfig(w http.ResponseWriter, r *http.Request) {
 
 // function to return current switch config
 func handleShowConfig(w http.ResponseWriter) {
-	// changes SwitchConfig struct to send back to browser
+	// Call shell script 
+	scriptPath := "./shell/get_status.sh"
+	cmd := exec.Command(scriptPath)
+
+	// exec script and get output
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// If script fails, return error to API user
+		http.Error(w, fmt.Sprintf("Error getting system status: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Return current global state
+	fmt.Printf("System status from script:\n%s\n", string(output))
+
+	// Return current config in JSON format
 	config := SwitchConfig{
-		// fetch from global var
 		Hostname:   currentHostname,
 		Interfaces: interfaceStates,
 		Status:     currentStatus,
 	}
-	// converts struct to json, layout at top of file has logic for this
 	json.NewEncoder(w).Encode(config)
 }
 
@@ -152,26 +166,56 @@ func handleSetConfig(w http.ResponseWriter, r *http.Request) {
 
 	// check if user wants to change hostname
 	if update.Hostname != "" {
+		// Call hostname script
+		scriptPath := "./shell/set_hostname.sh"
+		cmd := exec.Command(scriptPath, update.Hostname)
+
+		// Execute hostname change script
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			// Script failed
+			http.Error(w, fmt.Sprintf("Error setting hostname: %v\nScript output: %s", err, string(output)), http.StatusInternalServerError)
+			return
+		}
+
+		// Script success and update global var and track change
 		oldHostname := currentHostname
 		currentHostname = update.Hostname
 		changes["hostname"] = oldHostname + " -> " + currentHostname
+
+		// Log script exec for debugging
+		fmt.Printf("Hostname script output:\n%s\n", string(output))
 	}
 
 	// check if user wants to change status
 	if update.Status != "" {
+		// Update the variable (don't have script for this yet)
 		oldStatus := currentStatus
 		currentStatus = update.Status
 		changes["status"] = oldStatus + " -> " + currentStatus
 	}
 
-	// ceck if user wants to change an interface state
+	// check if user wants to change an interface state
 	if update.Interface != "" && update.InterfaceState != "" {
-		// fetch old state from global var
+		// Call interface script instead of just updating variable
+		scriptPath := "./shell/set_interface.sh"
+		cmd := exec.Command(scriptPath, update.Interface, update.InterfaceState)
+
+		// Execute interface change script
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			// Script failed - return error to API client
+			http.Error(w, fmt.Sprintf("Error setting interface: %v\nScript output: %s", err, string(output)), http.StatusInternalServerError)
+			return
+		}
+
+		// Script succeeded - update our global variable and track change
 		oldState := interfaceStates[update.Interface]
-		// update global var
 		interfaceStates[update.Interface] = update.InterfaceState
-		// build response to show changes
 		changes["interface_"+update.Interface] = oldState + " -> " + update.InterfaceState
+
+		// Log script execution for debugging
+		fmt.Printf("Interface script output:\n%s\n", string(output))
 	}
 
 	// send response showing what actually changed
