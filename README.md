@@ -1,6 +1,6 @@
 # SwitchConfigSim
 
-Simple network switch configuration simulator similar to NVIDIA's NVUE.
+Network switch configuration simulator similar to NVIDIA's NVUE.
 
 ## What it does
 
