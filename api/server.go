@@ -4,6 +4,7 @@ import (
 	"encoding/json" // data -> json
 	"fmt"
 	"net/http" // create web server, http requests
+	"os"       // reading files from disk
 )
 
 // Global vars to store the current switch state
@@ -42,6 +43,7 @@ type ConfigUpdate struct {
 func main() {
 	fmt.Println("SwitchConfigSim REST API Server")
 	fmt.Println("Starting server on http://localhost:8080")
+	fmt.Println("API Documentation available at http://localhost:8080/docs")
 	fmt.Println()
 
 	// Register API endpoints
@@ -49,6 +51,10 @@ func main() {
 	// when visiting /switch/config, call handleSwitchConfig
 	http.HandleFunc("/version", handleVersion)
 	http.HandleFunc("/", handleRoot)
+
+	// Add Swagger UI endpoints for interactive documentation
+	http.HandleFunc("/docs", handleSwaggerUI)
+	http.HandleFunc("/openapi.yaml", handleOpenAPISpec)
 
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
@@ -120,9 +126,9 @@ func handleShowConfig(w http.ResponseWriter) {
 	// changes SwitchConfig struct to send back to browser
 	config := SwitchConfig{
 		// fetch from global var
-		Hostname:   currentHostname, 
-		Interfaces: interfaceStates, 
-		Status:     currentStatus,   
+		Hostname:   currentHostname,
+		Interfaces: interfaceStates,
+		Status:     currentStatus,
 	}
 	// converts struct to json, layout at top of file has logic for this
 	json.NewEncoder(w).Encode(config)
@@ -175,4 +181,92 @@ func handleSetConfig(w http.ResponseWriter, r *http.Request) {
 		"message": "Configuration changes applied successfully",
 	}
 	json.NewEncoder(w).Encode(response)
+}
+
+// function for OpenAPI spec file
+func handleOpenAPISpec(w http.ResponseWriter, r *http.Request) {
+	// Only allow GET requests
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Read the OpenAPI file
+	yamlContent, err := os.ReadFile("openapi.yaml")
+	if err != nil {
+		http.Error(w, "OpenAPI specification not found", http.StatusNotFound)
+		return
+	}
+
+	// Set headers for YAML
+	w.Header().Set("Content-Type", "application/yaml")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Write(yamlContent)
+}
+
+// func for API docs
+func handleSwaggerUI(w http.ResponseWriter, r *http.Request) {
+	// Only allow GET requests
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Set content type to HTML
+	w.Header().Set("Content-Type", "text/html")
+
+	// Embedded Swagger UI HTML
+	swaggerHTML := `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="SwitchConfigSim API Documentation" />
+    <title>SwitchConfigSim API Documentation</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
+    <style>
+        body { margin: 0; }
+        .topbar { display: none; }
+        .swagger-ui .info { margin: 50px 0; }
+        .swagger-ui .info .title { 
+            color: #76B900; 
+            font-size: 36px;
+        }
+        .swagger-ui .scheme-container {
+            background: #76B900;
+            box-shadow: 0 1px 2px 0 rgba(0,0,0,.15);
+        }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js" crossorigin></script>
+    <script>
+        window.onload = () => {
+            window.ui = SwaggerUIBundle({
+                url: '/openapi.yaml',
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIBundle.presets.standalone,
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                tryItOutEnabled: true,
+                supportedSubmitMethods: ['get', 'put', 'post', 'delete', 'options', 'head', 'patch'],
+                validatorUrl: null,
+                docExpansion: 'list',
+                operationsSorter: 'alpha',
+                tagsSorter: 'alpha'
+            });
+        };
+    </script>
+</body>
+</html>`
+
+	// Send the HTML to the browser
+	w.Write([]byte(swaggerHTML))
 }

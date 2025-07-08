@@ -1,0 +1,239 @@
+openapi: 3.0.3
+info:
+  title: SwitchConfigSim API
+  description: |
+    Network switch config simulation API
+        
+    **Key Features:**
+    - Switch hostname management
+    - Interface state control (up/down)
+    - Switch operational status tracking
+    - Real-time configuration updates
+  version: 1.0.0
+  contact:
+    name: SwitchConfigSim
+    url: https://github.com/yourusername/SwitchConfigSim
+
+servers:
+  - url: http://localhost:8080
+    description: Local dev server
+
+paths:
+  /:
+    get:
+      summary: API Information
+      description: Get basic information about the SwitchConfigSim API and available endpoints
+      operationId: getApiInfo
+      tags:
+        - General
+      responses:
+        '200':
+          description: API information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: "SwitchConfigSim REST API"
+                  description:
+                    type: string
+                    example: "NVIDIA network switch management"
+                  endpoints:
+                    type: object
+                    properties:
+                      "GET /switch/config":
+                        type: string
+                        example: "Display switch configuration"
+                      "PUT /switch/config":
+                        type: string
+                        example: "Update switch configuration"
+                      "GET /version":
+                        type: string
+                        example: "Show version information"
+
+  /version:
+    get:
+      summary: Get Version Information
+      description: Retrieve version and build information for the SwitchConfigSim API
+      operationId: getVersion
+      tags:
+        - General
+      responses:
+        '200':
+          description: Version information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Version'
+
+  /switch/config:
+    get:
+      summary: Get Switch Configuration
+      description: |
+        Retrieve the current configuration of the simulated network switch.
+        This includes hostname, interface states, and operational status.
+        
+        Similar to running `nv show` command in NVIDIA's NVUE CLI.
+      operationId: getSwitchConfig
+      tags:
+        - Switch Management
+      responses:
+        '200':
+          description: Switch configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SwitchConfig'
+    
+    put:
+      summary: Update Switch Configuration
+      description: |
+        Update the switch configuration including hostname, operational status, 
+        or individual interface states.
+        
+        Similar to running `nv set` commands in NVIDIA's NVUE CLI.
+        You can update multiple properties in a single request.
+      operationId: updateSwitchConfig
+      tags:
+        - Switch Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigUpdate'
+            examples:
+              hostname_update:
+                summary: Update hostname only
+                value:
+                  hostname: "core-switch-01"
+              interface_update:
+                summary: Bring interface up
+                value:
+                  interface: "eth0"
+                  interface_state: "up"
+              status_update:
+                summary: Set maintenance mode
+                value:
+                  status: "Maintenance"
+              multiple_updates:
+                summary: Update multiple properties
+                value:
+                  hostname: "edge-switch-02"
+                  status: "Operational"
+                  interface: "eth1"
+                  interface_state: "down"
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "Config Updated"
+                  changes:
+                    type: object
+                    additionalProperties:
+                      type: string
+                    example:
+                      hostname: "switch1 -> core-switch-01"
+                      interface_eth0: "down -> up"
+                  message:
+                    type: string
+                    example: "Configuration changes applied successfully"
+        '400':
+          description: Invalid JSON in request body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid JSON"
+
+components:
+  schemas:
+    SwitchConfig:
+      type: object
+      description: Complete configuration state of the network switch
+      required:
+        - hostname
+        - interfaces
+        - status
+      properties:
+        hostname:
+          type: string
+          description: The switch hostname identifier
+          example: "switch1"
+        interfaces:
+          type: object
+          description: Current state of all network interfaces
+          additionalProperties:
+            type: string
+            enum: [up, down]
+          example:
+            eth0: "up"
+            eth1: "down"
+            eth2: "up"
+            ethx: "up"
+        status:
+          type: string
+          description: Overall operational status of the switch
+          enum: [Operational, Maintenance, Failed]
+          example: "Operational"
+
+    Version:
+      type: object
+      description: Version and build information
+      required:
+        - name
+        - version
+        - builtWith
+      properties:
+        name:
+          type: string
+          description: Application name
+          example: "SwitchConfigSim"
+        version:
+          type: string
+          description: Current version number
+          example: "v1.0.0"
+        builtWith:
+          type: string
+          description: Technology stack used
+          example: "Go REST API"
+
+    ConfigUpdate:
+      type: object
+      description: Request body for updating switch configuration
+      properties:
+        hostname:
+          type: string
+          description: New hostname for the switch
+          example: "core-switch-01"
+        status:
+          type: string
+          description: New operational status
+          enum: [Operational, Maintenance, Failed]
+          example: "Maintenance"
+        interface:
+          type: string
+          description: Interface name to update (required if interface_state is provided)
+          example: "eth0"
+        interface_state:
+          type: string
+          description: New state for the specified interface
+          enum: [up, down]
+          example: "up"
+
+tags:
+  - name: General
+    description: General API information and utilities
+  - name: Switch Management
+    description: Core switch configuration and management operations 
